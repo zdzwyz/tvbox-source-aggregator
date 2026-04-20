@@ -497,7 +497,14 @@ body::before{
     <div class="config-label">TVBox Config URL</div>
     <div class="config-url-row">
       <div class="config-url" id="configUrl"></div>
-      <button class="copy-btn" id="copyBtn" onclick="copyUrl()">Copy</button>
+      <button class="copy-btn" id="copyBtn" onclick="copyUrl('configUrl')">Copy</button>
+    </div>
+    <div style="margin-top:12px">
+      <div class="config-label">Live-Only Config URL</div>
+      <div class="config-url-row">
+        <div class="config-url" id="liveConfigUrl"></div>
+        <button class="copy-btn" id="copyLiveBtn" onclick="copyUrl('liveConfigUrl')">Copy</button>
+      </div>
     </div>
   </div>
 
@@ -511,6 +518,7 @@ const $ = id => document.getElementById(id);
 
 const configUrl = location.origin + '/';
 $('configUrl').textContent = configUrl;
+$('liveConfigUrl').textContent = location.origin + '/live-config';
 
 async function loadStatus() {
   try {
@@ -582,9 +590,10 @@ async function triggerRefresh() {
   }, 3000);
 }
 
-function copyUrl() {
-  const btn = $('copyBtn');
-  navigator.clipboard.writeText(configUrl).then(() => {
+function copyUrl(elementId) {
+  const text = $(elementId).textContent;
+  const btn = $(elementId).parentElement.querySelector('.copy-btn');
+  navigator.clipboard.writeText(text).then(() => {
     btn.textContent = 'Copied!';
     btn.className = 'copy-btn copied';
     setTimeout(() => {

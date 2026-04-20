@@ -1,6 +1,6 @@
 // 解析和规范化 TVBox JSON 配置
 
-import type { TVBoxConfig, TVBoxSite, SourcedConfig } from './types';
+import type { TVBoxConfig, TVBoxSite, TVBoxLive, SourcedConfig } from './types';
 
 /**
  * 从 SourcedConfig 中提取规范化的数据
@@ -15,7 +15,7 @@ export function normalizeConfig(sourced: SourcedConfig): SourcedConfig {
       spider: normalizeSpider(config.spider, sourced.sourceUrl),
       sites: normalizeSites(config.sites || [], config.spider, sourced.sourceUrl),
       parses: config.parses || [],
-      lives: config.lives || [],
+      lives: normalizeLives(config.lives || [], sourced.sourceUrl),
       hosts: config.hosts || [],
       rules: config.rules || [],
       doh: config.doh || [],
@@ -57,6 +57,11 @@ function normalizeSites(
 
       // type 0/1: 规范化 api URL
       if (site.type === 0 || site.type === 1) {
+        normalized.api = resolveUrl(site.api, sourceUrl);
+      }
+
+      // type 3: api 是 URL（非 csp_/py_/js_ 类名）时也做 resolve
+      if (site.type === 3 && isResolvableUrl(site.api)) {
         normalized.api = resolveUrl(site.api, sourceUrl);
       }
 
@@ -114,6 +119,38 @@ function resolveUrl(url: string, baseUrl: string): string {
   } catch {
     return url;
   }
+}
+
+/**
+ * 规范化直播列表：相对路径转绝对路径
+ */
+function normalizeLives(lives: TVBoxLive[], sourceUrl: string): TVBoxLive[] {
+  return lives.map((live) => {
+    const normalized = { ...live };
+
+    if (live.url && isResolvableUrl(live.url)) {
+      normalized.url = resolveUrl(live.url, sourceUrl);
+    }
+
+    if (live.jar) {
+      normalized.jar = resolveUrl(live.jar, sourceUrl);
+    }
+
+    return normalized;
+  });
+}
+
+/**
+ * 判断 URL 是否需要 resolve（是 URL 或相对路径，不是类名引用）
+ */
+function isResolvableUrl(url: string): boolean {
+  if (!url) return false;
+  if (url.startsWith('http://') || url.startsWith('https://')) return true;
+  if (url.startsWith('./') || url.startsWith('../')) return true;
+  if (url.startsWith('//')) return true;
+  // csp_/py_/js_ 是 JAR 类名引用，不是 URL
+  if (url.startsWith('csp_') || url.startsWith('py_') || url.startsWith('js_')) return false;
+  return false;
 }
 
 /**

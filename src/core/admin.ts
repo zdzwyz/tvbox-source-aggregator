@@ -572,6 +572,27 @@ body::before{
     </div>
   </div>
 
+  <!-- Live Sources Add -->
+  <div class="section">
+    <div class="section-title">Add Live Source</div>
+    <div class="add-form">
+      <input class="name-input" type="text" id="liveName" placeholder="Name (e.g. iptv365)">
+      <input type="url" id="liveUrl" placeholder="m3u/txt URL">
+      <button class="btn" id="liveAddBtn" onclick="addLive()">Add</button>
+    </div>
+  </div>
+
+  <!-- Live Sources list -->
+  <div class="section">
+    <div class="section-title">
+      <span>Live Sources</span>
+      <span class="count" id="liveCount">0</span>
+    </div>
+    <div class="source-list" id="liveList">
+      <div class="empty">Loading live sources...</div>
+    </div>
+  </div>
+
   <div class="footer">
     TVBox Source Aggregator &middot; Admin Console
   </div>
@@ -642,6 +663,7 @@ function toast(msg, type = 'success') {
 function loadAll() {
   loadSources();
   loadMacCMS();
+  loadLives();
   loadStatus();
 }
 
@@ -656,7 +678,7 @@ async function loadStatus() {
         hour:'2-digit', minute:'2-digit', second:'2-digit',
         hour12: false
       });
-      $('aggStatus').textContent = 'Last update: ' + fmt + ' | ' + d.sites + ' sites, ' + d.parses + ' parses, ' + d.lives + ' lives';
+      $('aggStatus').textContent = 'Last update: ' + fmt + ' | ' + d.sites + ' sites, ' + d.parses + ' parses, ' + d.lives + ' lives' + (d.liveSourceCount ? ', ' + d.liveSourceCount + ' live sources' : '');
       $('aggStatus').className = 'status-text';
     } else {
       $('aggStatus').textContent = 'Never updated — click Refresh';
@@ -764,7 +786,7 @@ async function loadMacCMS() {
     $('mcCount').textContent = sources.length;
 
     if (sources.length === 0) {
-      list.innerHTML = '<div class="empty">No MacCMS sources. Add above or use batch import.</div>';
+      list.innerHTML = '<div class="empty">No MacCMS sources. Add one above.</div>';
       return;
     }
 
@@ -875,6 +897,80 @@ async function batchImportMacCMS() {
     } else {
       toast(d.error || 'Import failed', 'error');
     }
+  } catch { toast('Network error', 'error'); }
+}
+
+// --- Live Sources ---
+async function loadLives() {
+  const list = $('liveList');
+  try {
+    const res = await authFetch('/admin/lives');
+    const entries = await res.json();
+    $('liveCount').textContent = entries.length;
+
+    if (entries.length === 0) {
+      list.innerHTML = '<div class="empty">No live sources. Add one above.</div>';
+      return;
+    }
+
+    list.innerHTML = entries.map(s => \`
+      <div class="source-item">
+        <span class="source-tag manual">LIVE</span>
+        <div class="source-info">
+          <div class="source-name">\${esc(s.name || 'Unnamed')}</div>
+          <div class="source-url">\${esc(s.url)}</div>
+        </div>
+        <div class="source-actions">
+          <button class="btn btn-sm btn-danger" onclick="removeLive('\${esc(s.url)}')">Remove</button>
+        </div>
+      </div>
+    \`).join('');
+  } catch {
+    list.innerHTML = '<div class="empty">Failed to load live sources</div>';
+  }
+}
+
+async function addLive() {
+  const url = $('liveUrl').value.trim();
+  if (!url) { $('liveUrl').focus(); return; }
+  const name = $('liveName').value.trim() || '';
+
+  const btn = $('liveAddBtn');
+  btn.textContent = 'Adding...';
+  btn.className = 'btn loading';
+
+  try {
+    const res = await authFetch('/admin/lives', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, url })
+    });
+    const d = await res.json();
+    if (res.ok) {
+      toast('Live source added');
+      $('liveUrl').value = '';
+      $('liveName').value = '';
+      loadLives();
+    } else {
+      toast(d.error || 'Failed to add', 'error');
+    }
+  } catch {
+    toast('Network error', 'error');
+  }
+
+  btn.textContent = 'Add';
+  btn.className = 'btn';
+}
+
+async function removeLive(url) {
+  try {
+    const res = await authFetch('/admin/lives', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    if (res.ok) { toast('Removed'); loadLives(); }
+    else { const d = await res.json(); toast(d.error || 'Failed', 'error'); }
   } catch { toast('Network error', 'error'); }
 }
 
