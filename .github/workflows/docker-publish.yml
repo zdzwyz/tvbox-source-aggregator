@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: rio22/tvbox-source-aggregator
+  IMAGE_NAME: rio22/tvbox-aggregator
 
 jobs:
   build-and-push:
